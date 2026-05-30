@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jcode"
+version = "0.1.0"
+description = "Local-model-friendly Coding Agent. Small models for small tasks, big models for big tasks."
+readme = "README.md"
+license = {text = "Apache-2.0"}
+authors = [{name = "AuA26"}]
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Code Generators",
+]
+dependencies = ["httpx>=0.25", "pyyaml>=6.0", "prompt-toolkit>=3.0"]
+
+[project.optional-dependencies]
+ollama = ["ollama>=0.4"]
+
+[project.scripts]
+jcode = "main:main"
+
+[tool.setuptools]
+py-modules = ["main", "main_code.version", "main_code.net_set"]
+packages = ["main_code", "experts"]

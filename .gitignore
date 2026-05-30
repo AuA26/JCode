@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+jcode.egg-info/
+.deep-copilot/
+config.json
+.env
+dist/
+build/
