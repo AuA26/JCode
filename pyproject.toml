@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jcode"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local-model-friendly Coding Agent. Small models for small tasks, big models for big tasks."
 readme = "README.md"
 license = {text = "Apache-2.0"}

@@ -9,16 +9,13 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion
 
 from main_code.config import init_config, Config
-from main_code.gate import classify, RouteResult
+from main_code.gate import classify_multi, RouteResult
 from main_code.context import Context
-from main_code.llm import chat, classify as llm_classify
+from main_code.llm import chat, classify_steps
 from main_code.pipeline import run_pipeline
-from main_code.commands import handle_command
+from main_code.commands import handle_command, COMMAND_DESCRIPTIONS
 from main_code.version import get_local_version
 from main_code.banner import render
-
-_COMMANDS = {"help": "获取帮助", "exit": "退出", "api": "API配置", "model": "切换模型",
-             "experts": "内置专家", "plan": "执行计划", "cd": "切换目录", "files": "项目文件"}
 
 
 class SlashCompleter(Completer):
@@ -26,7 +23,7 @@ class SlashCompleter(Completer):
         text = document.text_before_cursor.lstrip()
         if not text.startswith("/"):
             return
-        for cmd, desc in _COMMANDS.items():
+        for cmd, desc in COMMAND_DESCRIPTIONS.items():
             if cmd.startswith(text[1:]):
                 yield Completion(cmd, start_position=-len(text) + 1, display_meta=desc)
 
@@ -42,8 +39,9 @@ def main():
     ctx = Context()
     project_dir = Path.cwd()
 
-    print(f"  dir: {project_dir}")
-    print(f"  model: {cfg.model} ({cfg.provider})")
+    print(f"  文件目录: {project_dir}")
+    print(f"  模型供应商: {cfg.provider}")
+    print(f"  模型: {cfg.model}")
     print(f"  /help 获取帮助\n")
 
     while True:
@@ -67,13 +65,10 @@ def main():
                 break
             continue
 
-        def llm_fn(text, labels):
-            return llm_classify(text, labels, cfg)
-
-        route = classify(user_input, llm_fn)
+        routes = classify_multi(user_input, classify_steps, cfg)
         ctx.add_message("user", user_input)
-
-        if route.route == "chat":
+        non_chat = [r for r in routes if r.route != "chat"]
+        if not non_chat:
             response = chat(
                 messages=[{"role": "user", "content": user_input}],
                 cfg=cfg,
@@ -82,8 +77,14 @@ def main():
             print(f"\n{response}\n")
             ctx.add_message("assistant", response)
         else:
-            print(f"  route: {route.route} ({route.confidence:.0%})")
-            response = run_pipeline(user_input, route, project_dir, cfg, ctx)
+            if len(non_chat) > 1:
+                print(f"  multi-step: {' → '.join(r.route for r in non_chat)}")
+            else:
+                route_label = non_chat[0].route
+                if non_chat[0].expert:
+                    route_label += f"+{non_chat[0].expert}"
+                print(f"  route: {route_label}")
+            response = run_pipeline(user_input, non_chat, project_dir, cfg, ctx)
             ctx.add_message("assistant", response)
 
         print()

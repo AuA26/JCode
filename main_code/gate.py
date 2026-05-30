@@ -1,5 +1,6 @@
 from __future__ import annotations
 import re
+import logging
 from dataclasses import dataclass
 from typing import Callable
 
@@ -49,8 +50,8 @@ _KEYWORD_ROUTES: dict[str, list[tuple[str, float]]] = {
     ],
 }
 
-_KEYWORD_WEIGHT = 0.7
-_AI_WEIGHT = 0.3
+_KEYWORD_WEIGHT = 0.2
+_AI_WEIGHT = 0.8
 _HIGH_CONFIDENCE = 0.8
 _MIN_CONFIDENCE = 0.3
 
@@ -58,7 +59,8 @@ _EXPERT_KEYWORDS: dict[str, list[str]] = {
     "fastapi": [r"fastapi", r"路由", r"接口", r"endpoint", r"api", r"依赖注入"],
     "mysql": [r"mysql", r"建表", r"索引", r"pymysql", r"sql", r"数据库"],
     "typehint": [r"类型注解", r"type hint", r"加类型", r"类型提示"],
-    "docstring": [r"注释", r"docstring", r"加注释", r"写注释"],
+    "nocomment": [r"删.*注释", r"去.*注释", r"去除.*注释", r"移除.*注释", r"不要.*注释", r"清理.*注释", r"去掉.*注释"],
+    "docstring": [r"加注释", r"写注释", r"增加注释", r"添加注释", r"docstring"],
 }
 
 
@@ -138,7 +140,7 @@ def classify(
                 route=best_route,
                 confidence=best_score,
                 source="hybrid",
-                reasoning=f"kw({kw_scores.get(best_route,0):.2f})*0.7 + ai({ai_scores.get(best_route,0):.2f})*0.3",
+                reasoning=f"kw({kw_scores.get(best_route,0):.2f})*0.2 + ai({ai_scores.get(best_route,0):.2f})*0.8",
                 expert=expert,
             )
 
@@ -157,3 +159,74 @@ def _detect_expert(text: str) -> str:
             if re.search(p, text, re.IGNORECASE):
                 return name
     return ""
+
+
+def classify_multi(
+    user_input: str,
+    llm_classify_steps,
+    cfg,
+) -> list[RouteResult]:
+    text = user_input.strip()
+    if not text:
+        return [RouteResult(route="chat", confidence=1.0, source="keyword", reasoning="empty")]
+    kw_scores = _keyword_score(text)
+    data = llm_classify_steps(text, cfg)
+    is_compound = data.get("is_compound", False)
+    steps = data.get("steps", [])
+    results: list[RouteResult] = []
+    for step in steps:
+        route = step.get("route", "chat")
+        if route not in _PIPELINE_MAP:
+            route = "chat"
+        expert = step.get("expert", "")
+        if not expert:
+            expert = _detect_expert(step.get("task", text))
+        ai_score = 1.0 if is_compound else 1.0
+        kw = kw_scores.get(route, 0.0)
+        combined = kw * _KEYWORD_WEIGHT + ai_score * _AI_WEIGHT
+        results.append(RouteResult(
+            route=route,
+            confidence=min(1.0, combined),
+            source="ai_multi" if is_compound else "ai",
+            reasoning=f"kw({kw:.2f})*0.2 + ai(1.0)*0.8 | task: {step.get('task', text)[:80]}",
+            expert=expert,
+        ))
+    _save_route_log(text, results, data, cfg)
+    return results if results else [RouteResult(route="chat", confidence=0.5, source="keyword", reasoning="fallback")]
+
+
+def _save_route_log(original_input: str, results: list[RouteResult], raw_data: dict, cfg) -> None:
+    import json
+    import platform
+    import sys
+    from datetime import datetime, timezone, timedelta
+    from pathlib import Path
+    cst = timezone(timedelta(hours=8))
+    now = datetime.now(cst)
+    filename = now.strftime("%Y%m%d_%H%M%S_%f") + ".json"
+    log_dir = Path(__file__).parent.parent / "ROU_TN"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / filename
+    record = {
+        "timestamp": now.isoformat(),
+        "os": f"{platform.system()} {platform.release()}",
+        "python": sys.version.split()[0],
+        "input": original_input,
+        "is_compound": raw_data.get("is_compound", False),
+        "steps": [
+            {
+                "route": r.route,
+                "expert": r.expert,
+                "confidence": round(r.confidence, 4),
+                "source": r.source,
+                "reasoning": r.reasoning,
+                "task": raw_data.get("steps", [{}])[i].get("task", original_input) if i < len(raw_data.get("steps", [])) else original_input,
+            }
+            for i, r in enumerate(results)
+        ],
+        "raw_response": raw_data,
+    }
+    with open(log_path, "w", encoding="utf-8") as f:
+        json.dump(record, f, ensure_ascii=False, indent=2)
+    logger = logging.getLogger("jcode.gate")
+    logger.info(f"route log saved: {filename}")

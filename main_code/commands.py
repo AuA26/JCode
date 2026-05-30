@@ -7,6 +7,19 @@ from .locator import locate
 from .llm import classify as llm_classify
 from .tools import list_files
 
+# PUBLIC: HELP_TEXT, COMMAND_DESCRIPTIONS, EXPERTS_INFO, handle_command
+
+COMMAND_DESCRIPTIONS: dict[str, str] = {
+    "help": "获取帮助",
+    "exit": "退出",
+    "api": "API配置",
+    "model": "切换模型",
+    "experts": "内置专家",
+    "plan": "执行计划",
+    "cd": "切换目录",
+    "files": "项目文件",
+}
+
 HELP_TEXT = """
 JCode 命令:
   /help              获取帮助

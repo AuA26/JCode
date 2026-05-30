@@ -123,7 +123,7 @@ def _setup_ollama_remote(cfg: Config) -> Config:
     cfg.model = model
     cfg.api_key = "ollama"
     save_config(cfg)
-    print(f"  {GREEN}✓{RESET} provider=ollama model={model}")
+    print(f"  {GREEN}✓{RESET} 供应商=ollama 模型={model}")
     return cfg
 
 def _pick_ollama_model(cfg: Config) -> Config | None:
@@ -160,7 +160,7 @@ def _pick_ollama_model(cfg: Config) -> Config | None:
     cfg.base_url = "http://localhost:11434"
     cfg.api_key = "ollama"
     save_config(cfg)
-    print(f"  {GREEN}✓{RESET} provider=ollama model={cfg.model}")
+    print(f"  {GREEN}✓{RESET} 供应商=ollama 模型={cfg.model}")
     return cfg
 
 def _setup_ollama_local(cfg: Config) -> Config | None:
@@ -212,5 +212,5 @@ def init_config() -> Config:
         return init_config()
     cfg.model = models[model_idx]
     save_config(cfg)
-    print(f"  {GREEN}✓{RESET} provider=deepseek model={cfg.model}")
+    print(f"  {GREEN}✓{RESET} 供应商=deepseek 模型={cfg.model}")
     return cfg
